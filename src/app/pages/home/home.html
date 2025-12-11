@@ -1,0 +1,151 @@
+<div class="scene">
+  <div id="snow-container"></div>
+
+  <div class="decor-tree left">🌲</div><div class="decor-tree right">🌲</div>
+  <div class="decor-stars">
+    <div class="star" style="top: 10%; left: 15%;">⭐</div>
+    <div class="star" style="top: 20%; left: 80%;">✨</div>
+    <div class="star" style="top: 15%; left: 50%;">💫</div>
+  </div>
+
+  <div class="nav-tabs">
+    <div class="nav-item" [class.active]="currentView === 'gifts'" (click)="switchView('gifts')">🎁 Lời chúc</div>
+    <div class="nav-item" [class.active]="currentView === 'calendar'" (click)="switchView('calendar')">📅 Lịch ({{collectedCount}}/31)</div>
+  </div>
+
+  <div class="content-wrapper">
+    <div class="view-gifts" *ngIf="currentView === 'gifts'">
+
+      <div class="countdown-section" *ngIf="!showGifts">
+        <div class="countdown-decoration">❄️ Christmas Countdown ❄️</div>
+        <div class="countdown-timer">
+          <div class="time-unit snow-cap"><div class="time-value">{{ daysUntilChristmas }}</div><div class="time-label">Ngày</div></div>
+          <div class="time-separator">:</div>
+          <div class="time-unit snow-cap"><div class="time-value">{{ hoursUntilChristmas }}</div><div class="time-label">Giờ</div></div>
+          <div class="time-separator">:</div>
+          <div class="time-unit snow-cap"><div class="time-value">{{ minutesUntilChristmas }}</div><div class="time-label">Phút</div></div>
+          <div class="time-separator">:</div>
+          <div class="time-unit snow-cap"><div class="time-value">{{ secondsUntilChristmas }}</div><div class="time-label">Giây</div></div>
+        </div>
+      </div>
+
+      <div class="hero-section" *ngIf="!showGifts">
+        <div class="santa-container"><div class="santa-icon">🎅</div></div>
+        <h1 class="main-title">
+          <span class="title-line">Merry Christmas</span>
+          <span class="title-line subtitle-glow">2025</span>
+        </h1>
+        <button class="start-btn" (click)="revealGifts()" (mouseenter)="playHover()">
+          <span class="btn-icon">🎁</span><span>Khám Phá</span><span class="btn-shine"></span>
+        </button>
+      </div>
+
+      <div class="gift-section" *ngIf="showGifts && !showCard">
+        <h2 class="section-title fancy-title">
+          <span class="title-icon glow-icon">🎄</span>
+          <span class="title-text">✨ Vài Lời Chúc Giản Đơn ✨</span>
+          <span class="title-icon glow-icon">🎄</span>
+        </h2>
+
+        <div class="gifts-container">
+          <div class="gift-card" *ngFor="let card of cards; let idx = index"
+               (click)="openCard(idx)" (mouseenter)="playHover()">
+            <div class="gift-box">
+              <div class="gift-icon">{{ card.icon }}</div>
+            </div>
+            <p class="gift-label">  Lời Chúc {{ idx + 1 }}</p>
+          </div>
+        </div>
+      </div> <div class="card-section" *ngIf="showCard && currentCard">
+      <div class="animated-card" [style.background]="currentCard.color">
+        <div class="card-decoration" *ngFor="let deco of currentCard.decorations; let i = index" [style.top]="[10, 15, 85, 90][i] + '%'" [style.left]="[5, 90, 10, 85][i] + '%'">{{ deco }}</div>
+        <div class="card-content">
+          <div class="card-icon-container"><div class="icon-glow"></div><div class="card-icon">{{ currentCard.icon }}</div></div>
+          <h1 class="card-title">{{ currentCard.title }}</h1>
+          <div class="card-divider"><span class="divider-line"></span></div>
+          <div class="message-container"><div class="message-content-wrapper"><p class="card-message">{{ typingText }}<span class="cursor" *ngIf="showCursor">|</span></p></div></div>
+          <div class="card-signature"><div class="wax-seal"><span>S</span></div><p class="signature-text">From Santa with Love</p></div>
+        </div>
+        <div class="card-shine shine-1"></div>
+        <div class="corner-deco top-left">❄️</div><div class="corner-deco top-right">❄️</div><div class="corner-deco bottom-left">❄️</div><div class="corner-deco bottom-right">❄️</div>
+      </div>
+      <button class="retry-btn" (click)="resetCard()" (mouseenter)="playHover()">🔄 Chọn lại</button>
+    </div>
+    </div>
+
+    <div class="view-calendar" *ngIf="currentView === 'calendar'">
+      <h2 class="section-title month-title">
+        <span class="title-icon rainbow">❄️</span>
+        <span class="title-text rainbow-text">Tháng 12</span>
+        <span class="title-icon rainbow">❄️</span>
+      </h2>
+
+      <div class="calendar-container">
+        <div class="calendar-header"><div class="weekday" *ngFor="let day of weekDays">{{ day }}</div></div>
+        <div class="calendar-grid">
+          <div class="calendar-door empty" *ngFor="let empty of emptySlots"></div>
+          <div class="calendar-door" *ngFor="let item of calendarDays"
+               [class.checked-in]="item.isOpen" [class.locked]="item.isLocked" [class.shake]="item.isShaking"
+               [class.special-day]="item.day === 24 || item.day === 25"
+               (click)="openCalendarDoor(item)" (mouseenter)="playHover()">
+            <div class="door-front" *ngIf="!item.isOpen">
+              <span class="date-text">{{ item.day }}/12</span>
+              <span class="special-icon" *ngIf="item.day === 24">🦌</span><span class="special-icon" *ngIf="item.day === 25">🎅</span>
+              <span class="lock-icon" *ngIf="item.isLocked">🔒</span>
+            </div>
+            <div class="door-back" *ngIf="item.isOpen">
+              <span class="sticker-img">{{ item.image }}</span><span class="check-mark">✔</span>
+              <div class="rarity-dot" [ngClass]="{'dot-rare': item.rarity==='rare','dot-epic': item.rarity==='epic','dot-legendary': item.rarity==='legendary'}"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reindeer-container" *ngIf="showReindeerFly">
+    <div class="reindeer-sleigh">🦌🦌🛷🎅</div>
+    <div class="snow-storm"></div>
+  </div>
+
+  <div class="fireworks-container" *ngIf="showFireworks">
+    <canvas id="fireworks-canvas" style="display: block; width: 100%; height: 100%;"></canvas>
+
+    <div class="grand-banner big" id="merry-banner">
+      <div class="banner-ribbon">
+        <div class="banner-content"><span class="banner-star">🌟</span>MERRY CHRISTMAS<span class="banner-star">🌟</span></div>
+        <div class="banner-tail left"></div><div class="banner-tail right"></div>
+      </div>
+      <div class="banner-subtext">2025</div>
+    </div>
+  </div>
+
+  <div class="opening-overlay" *ngIf="isOpening">
+    <div class="opening-gift-container">
+      <div class="opening-gift-box"><div class="gift-icon big-icon">🎁</div></div>
+    </div>
+  </div>
+
+  <div class="calendar-popup-overlay" *ngIf="showCalendarPopup && selectedCalendarItem">
+    <div class="premium-popup-card" [class.popup-rare]="selectedCalendarItem.rarity === 'rare'" [class.popup-legendary]="selectedCalendarItem.rarity === 'legendary'">
+      <div class="popup-inner-border">
+        <div class="rarity-badge" [class.badge-rare]="selectedCalendarItem.rarity === 'rare'" [class.badge-legendary]="selectedCalendarItem.rarity === 'legendary'">{{ selectedCalendarItem.rarity | uppercase }}</div>
+        <div class="popup-ribbon">Ngày {{ selectedCalendarItem.day }}</div>
+        <div class="popup-icon-container">
+          <div class="popup-glow"></div>
+          <div class="popup-main-icon sticker-anim">{{ selectedCalendarItem.image }}</div>
+        </div>
+        <div class="popup-text-content">
+          <h3 class="popup-heading">{{ selectedCalendarItem.title }}</h3>
+          <p class="popup-message">"{{ selectedCalendarItem.content }}"</p>
+        </div>
+        <button class="premium-btn" (click)="closeCalendarPopup()">Tuyệt vời! ❤️</button>
+      </div>
+      <div class="deco-corner tl">❄️</div><div class="deco-corner tr">❄️</div><div class="deco-corner bl">❄️</div><div class="deco-corner br">❄️</div>
+    </div>
+  </div>
+
+  <button class="music-btn" (click)="toggleMusic()" [class.playing]="isMusicPlaying"><span class="music-icon">{{ isMusicPlaying ? '🔊' : '🔇' }}</span></button>
+
+  <div class="footer-decor"><div class="snow-ground"></div></div>
+</div>
