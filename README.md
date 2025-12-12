@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/banner.png" width="100%" alt="Christmas App Banner" />
+  <img src="public/assets/img/banner.png" width="100%" alt="Christmas App Banner" />
 </p>
 
 # ChristmasApp
