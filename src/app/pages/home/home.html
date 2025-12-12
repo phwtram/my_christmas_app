@@ -1,7 +1,8 @@
 <div class="scene">
   <div id="snow-container"></div>
 
-  <div class="decor-tree left">🌲</div><div class="decor-tree right">🌲</div>
+  <div class="decor-tree left">🌲</div>
+  <div class="decor-tree right">🌲</div>
   <div class="decor-stars">
     <div class="star" style="top: 10%; left: 15%;">⭐</div>
     <div class="star" style="top: 20%; left: 80%;">✨</div>
@@ -11,11 +12,47 @@
   <div class="nav-tabs">
     <div class="nav-item" [class.active]="currentView === 'gifts'" (click)="switchView('gifts')">🎁 Lời chúc</div>
     <div class="nav-item" [class.active]="currentView === 'calendar'" (click)="switchView('calendar')">📅 Lịch ({{collectedCount}}/31)</div>
+    <button class="nav-item" [class.active]="currentView === 'collection'" (click)="switchView('collection')">🏆 Sưu Tầm</button>
+  </div>
+
+  <div class="collection-view" *ngIf="currentView === 'collection'">
+    <div class="collection-header">
+      <h2>Hành Trình Giáng Sinh</h2>
+      <div class="progress-bar-container">
+        <div class="progress-info">
+          <span>Đã thu thập: {{collectedCount}} tem</span>
+          <span>Mục tiêu: 25 tem</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" [style.width.%]="(collectedCount / 25) * 100"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="milestones-grid">
+      <div class="milestone-card" *ngFor="let m of milestones"
+           [class.locked]="!m.isUnlocked"
+           [class.claimed]="m.isClaimed"
+           (click)="claimReward(m)">
+
+        <div class="m-icon">{{m.isUnlocked ? m.icon : '🔒'}}</div>
+        <div class="m-content">
+          <div class="m-level">Mốc {{m.level}} Tem</div>
+          <div class="m-name">{{m.name}}</div>
+          <div class="m-status">
+            <span *ngIf="m.isClaimed" class="st-claimed">Đã nhận ✔️</span>
+            <span *ngIf="!m.isClaimed && m.isUnlocked" class="st-claim-now">Nhấn để nhận! 🎁</span>
+            <span *ngIf="!m.isUnlocked" class="st-locked">Chưa đạt</span>
+          </div>
+        </div>
+        <div *ngIf="m.isUnlocked && !m.isClaimed" class="glow-effect"></div>
+      </div>
+    </div>
   </div>
 
   <div class="content-wrapper">
-    <div class="view-gifts" *ngIf="currentView === 'gifts'">
 
+    <div class="view-gifts" *ngIf="currentView === 'gifts'">
       <div class="countdown-section" *ngIf="!showGifts">
         <div class="countdown-decoration">❄️ Christmas Countdown ❄️</div>
         <div class="countdown-timer">
@@ -53,24 +90,26 @@
             <div class="gift-box">
               <div class="gift-icon">{{ card.icon }}</div>
             </div>
-            <p class="gift-label">  Lời Chúc {{ idx + 1 }}</p>
+            <p class="gift-label">Lời Chúc {{ idx + 1 }}</p>
           </div>
         </div>
-      </div> <div class="card-section" *ngIf="showCard && currentCard">
-      <div class="animated-card" [style.background]="currentCard.color">
-        <div class="card-decoration" *ngFor="let deco of currentCard.decorations; let i = index" [style.top]="[10, 15, 85, 90][i] + '%'" [style.left]="[5, 90, 10, 85][i] + '%'">{{ deco }}</div>
-        <div class="card-content">
-          <div class="card-icon-container"><div class="icon-glow"></div><div class="card-icon">{{ currentCard.icon }}</div></div>
-          <h1 class="card-title">{{ currentCard.title }}</h1>
-          <div class="card-divider"><span class="divider-line"></span></div>
-          <div class="message-container"><div class="message-content-wrapper"><p class="card-message">{{ typingText }}<span class="cursor" *ngIf="showCursor">|</span></p></div></div>
-          <div class="card-signature"><div class="wax-seal"><span>S</span></div><p class="signature-text">From Santa with Love</p></div>
-        </div>
-        <div class="card-shine shine-1"></div>
-        <div class="corner-deco top-left">❄️</div><div class="corner-deco top-right">❄️</div><div class="corner-deco bottom-left">❄️</div><div class="corner-deco bottom-right">❄️</div>
       </div>
-      <button class="retry-btn" (click)="resetCard()" (mouseenter)="playHover()">🔄 Chọn lại</button>
-    </div>
+
+      <div class="card-section" *ngIf="showCard && currentCard">
+        <div class="animated-card" [style.background]="currentCard.color">
+          <div class="card-decoration" *ngFor="let deco of currentCard.decorations; let i = index" [style.top]="[10, 15, 85, 90][i] + '%'" [style.left]="[5, 90, 10, 85][i] + '%'">{{ deco }}</div>
+          <div class="card-content">
+            <div class="card-icon-container"><div class="icon-glow"></div><div class="card-icon">{{ currentCard.icon }}</div></div>
+            <h1 class="card-title">{{ currentCard.title }}</h1>
+            <div class="card-divider"><span class="divider-line"></span></div>
+            <div class="message-container"><div class="message-content-wrapper"><p class="card-message">{{ typingText }}<span class="cursor" *ngIf="showCursor">|</span></p></div></div>
+            <div class="card-signature"><div class="wax-seal"><span>S</span></div><p class="signature-text">From Santa with Love</p></div>
+          </div>
+          <div class="card-shine shine-1"></div>
+          <div class="corner-deco top-left">❄️</div><div class="corner-deco top-right">❄️</div><div class="corner-deco bottom-left">❄️</div><div class="corner-deco bottom-right">❄️</div>
+        </div>
+        <button class="retry-btn" (click)="resetCard()" (mouseenter)="playHover()">🔄 Chọn lại</button>
+      </div>
     </div>
 
     <div class="view-calendar" *ngIf="currentView === 'calendar'">
@@ -89,7 +128,7 @@
                [class.special-day]="item.day === 24 || item.day === 25"
                (click)="openCalendarDoor(item)" (mouseenter)="playHover()">
             <div class="door-front" *ngIf="!item.isOpen">
-              <span class="date-text">{{ item.day }}/12</span>
+              <span class="date-text">{{ item.day }}</span>
               <span class="special-icon" *ngIf="item.day === 24">🦌</span><span class="special-icon" *ngIf="item.day === 25">🎅</span>
               <span class="lock-icon" *ngIf="item.isLocked">🔒</span>
             </div>
@@ -103,26 +142,14 @@
     </div>
   </div>
 
-  <div class="reindeer-container" *ngIf="showReindeerFly">
-    <div class="reindeer-sleigh">🦌🦌🛷🎅</div>
-    <div class="snow-storm"></div>
-  </div>
-
-  <div class="fireworks-container" *ngIf="showFireworks">
-    <canvas id="fireworks-canvas" style="display: block; width: 100%; height: 100%;"></canvas>
-
-    <div class="grand-banner big" id="merry-banner">
-      <div class="banner-ribbon">
-        <div class="banner-content"><span class="banner-star">🌟</span>MERRY CHRISTMAS<span class="banner-star">🌟</span></div>
-        <div class="banner-tail left"></div><div class="banner-tail right"></div>
-      </div>
-      <div class="banner-subtext">2025</div>
-    </div>
-  </div>
-
-  <div class="opening-overlay" *ngIf="isOpening">
-    <div class="opening-gift-container">
-      <div class="opening-gift-box"><div class="gift-icon big-icon">🎁</div></div>
+  <div class="popup-overlay" *ngIf="showRewardPopup && currentReward">
+    <div class="popup-content reward-popup">
+      <div class="close-btn" (click)="closeRewardPopup()">×</div>
+      <div class="reward-icon">{{currentReward.icon}}</div>
+      <h3>Chúc Mừng!</h3>
+      <p class="reward-name">{{currentReward.name}}</p>
+      <p class="reward-desc">{{currentReward.description}}</p>
+      <button class="btn-primary" (click)="closeRewardPopup()">Tuyệt Vời!</button>
     </div>
   </div>
 
@@ -142,6 +169,28 @@
         <button class="premium-btn" (click)="closeCalendarPopup()">Tuyệt vời! ❤️</button>
       </div>
       <div class="deco-corner tl">❄️</div><div class="deco-corner tr">❄️</div><div class="deco-corner bl">❄️</div><div class="deco-corner br">❄️</div>
+    </div>
+  </div>
+
+  <div class="reindeer-container" *ngIf="showReindeerFly">
+    <div class="reindeer-sleigh">🦌🦌🛷🎅</div>
+    <div class="snow-storm"></div>
+  </div>
+
+  <div class="fireworks-container" *ngIf="showFireworks">
+    <canvas id="fireworks-canvas" style="display: block; width: 100%; height: 100%;"></canvas>
+    <div class="grand-banner big" id="merry-banner">
+      <div class="banner-ribbon">
+        <div class="banner-content"><span class="banner-star">🌟</span>MERRY CHRISTMAS<span class="banner-star">🌟</span></div>
+        <div class="banner-tail left"></div><div class="banner-tail right"></div>
+      </div>
+      <div class="banner-subtext">2025</div>
+    </div>
+  </div>
+
+  <div class="opening-overlay" *ngIf="isOpening">
+    <div class="opening-gift-container">
+      <div class="opening-gift-box"><div class="gift-icon big-icon">🎁</div></div>
     </div>
   </div>
 

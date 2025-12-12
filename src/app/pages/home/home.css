@@ -533,3 +533,176 @@ button, .gift-card, .music-btn, .calendar-door { cursor: pointer; }
   .calendar-container { padding: 15px; }
   .month-title { font-size: 32px; }
 }
+
+/* Collection View Styles */
+.collection-view {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+  color: white;
+  animation: fadeIn 0.5s ease;
+}
+
+.collection-header {
+  text-align: center;
+  margin-bottom: 30px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 20px;
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Progress Bar */
+.progress-bar-container {
+  margin-top: 15px;
+}
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #ffd700;
+}
+.progress-track {
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff6b6b, #ffd700);
+  width: 0%;
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+/* Milestones Grid */
+.milestones-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 15px;
+}
+
+.milestone-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+  color: #333;
+}
+
+/* States */
+.milestone-card.locked {
+  background: rgba(0, 0, 0, 0.5);
+  color: #ccc;
+  cursor: default;
+  opacity: 0.8;
+}
+
+.milestone-card.claimed {
+  background: rgba(255, 255, 255, 0.6);
+  border: 2px solid #4ecdc4;
+}
+
+.milestone-card:not(.locked):not(.claimed):hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+  background: white;
+}
+
+.m-icon {
+  font-size: 2.5rem;
+}
+
+.m-content {
+  flex: 1;
+}
+
+.m-level {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #666;
+}
+.milestone-card.locked .m-level { color: #999; }
+
+.m-name {
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin: 2px 0 5px 0;
+}
+
+.st-claim-now {
+  color: #e74c3c;
+  font-weight: bold;
+  animation: pulseText 1s infinite;
+}
+.st-claimed { color: #27ae60; font-weight: bold; }
+.st-locked { font-style: italic; }
+
+/* Glow Animation cho quà chưa nhận */
+.glow-effect {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border: 2px solid #ffd700;
+  border-radius: 12px;
+  animation: borderGlow 1.5s infinite;
+  pointer-events: none;
+}
+
+@keyframes borderGlow {
+  0% { box-shadow: 0 0 5px #ffd700; opacity: 1; }
+  50% { box-shadow: 0 0 20px #ffd700; opacity: 0.5; }
+  100% { box-shadow: 0 0 5px #ffd700; opacity: 1; }
+}
+
+@keyframes pulseText {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+.popup-overlay {
+  position: fixed; /* Ghim chặt vào màn hình, không bị trôi theo nội dung */
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.85); /* Nền đen mờ */
+  z-index: 100000; /* Đảm bảo nổi cao nhất */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(5px);
+  animation: fadeIn 0.3s ease-out;
+}
+/* Popup Reward Style */
+.reward-popup {
+  background: #fff;
+  width: 90%;
+  max-width: 400px;
+  padding: 30px;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 0 50px rgba(255, 215, 0, 0.8); /* Viền sáng vàng */
+  border: 4px solid #ffd700;
+  animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative; /* Để nút close định vị theo cái hộp này */
+}
+.reward-popup .reward-icon { font-size: 80px; margin-bottom: 10px; animation: bounce 2s infinite; }
+.reward-popup h3 { font-family: 'Dancing Script', cursive; font-size: 35px; color: #c92a2a; margin: 0; }
+.reward-popup .reward-name { font-size: 22px; font-weight: bold; color: #d35400; margin: 10px 0; }
+.reward-popup .reward-desc { color: #555; margin-bottom: 20px; }
+.reward-popup .btn-primary {
+  background: #2d8659; color: white; border: none; padding: 10px 30px;
+  border-radius: 50px; font-size: 18px; cursor: pointer;
+}

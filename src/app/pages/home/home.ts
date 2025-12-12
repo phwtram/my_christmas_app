@@ -4,6 +4,15 @@ import { isPlatformBrowser, NgIf, NgFor, NgClass, UpperCasePipe } from '@angular
 interface Snowflake { element: HTMLDivElement; x: number; y: number; speed: number; rotation: number; rotationSpeed: number; }
 interface ChristmasCard { id: number; theme: string; color: string; icon: string; title: string; message: string; decorations: string[]; }
 interface CalendarDay { day: number; isOpen: boolean; isLocked: boolean; isShaking: boolean; content: string; image: string; title: string; type: 'gift'|'message'|'song'; rarity: 'common'|'rare'|'epic'|'legendary'; }
+interface CollectionMilestone {
+  level: number;
+  icon: string;
+  name: string;
+  description: string;
+  isUnlocked: boolean;
+  isClaimed: boolean;
+  specialEffect?: boolean;
+}
 
 @Component({
   selector: 'app-home',
@@ -13,20 +22,61 @@ interface CalendarDay { day: number; isOpen: boolean; isLocked: boolean; isShaki
   imports: [NgIf, NgFor, NgClass, UpperCasePipe]
 })
 export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
-  currentView: any = 'gifts'; isBrowser: boolean; private isDestroyed = false;
-  calendarDays: CalendarDay[] = []; weekDays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']; emptySlots: number[] = [];
-  selectedCalendarItem: CalendarDay | null = null; showCalendarPopup = false; collectedCount = 0;
-  showReindeerFly = false; showFireworks = false; showGifts = false; showCard = false;
-  currentCard: ChristmasCard | null = null; typingText = ''; showCursor = true; isOpening = false; isMusicPlaying = false; selectedGiftIndex = -1;
+  // --- STATE QUẢN LÝ VIEW ---
+  currentView: any = 'gifts';
+  isBrowser: boolean;
+  private isDestroyed = false;
 
-  private snowflakes: Snowflake[] = []; private animationId?: number; private snowInterval?: any;
-  private typingInterval?: any; private cursorInterval?: any; private countdownInterval?: any;
-  private bgMusic?: HTMLAudioElement; private howlerMusic?: HTMLAudioElement;
+  // --- LỊCH & ĐẾM NGƯỢC ---
+  calendarDays: CalendarDay[] = [];
+  weekDays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+  emptySlots: number[] = [];
+  selectedCalendarItem: CalendarDay | null = null;
+  showCalendarPopup = false;
 
   daysUntilChristmas = 0; hoursUntilChristmas = 0; minutesUntilChristmas = 0; secondsUntilChristmas = 0;
+
+  // --- SƯU TẦM (COLLECTION) ---
+  collectedCount: number = 0;
+  milestones: CollectionMilestone[] = [];
+  showRewardPopup: boolean = false;
+  currentReward: CollectionMilestone | null = null;
+
+  // --- HIỆU ỨNG & THIỆP ---
+  showReindeerFly = false;
+  showFireworks = false;
+  showGifts = false;
+  showCard = false;
+  currentCard: ChristmasCard | null = null;
+  typingText = '';
+  showCursor = true;
+  isOpening = false;
+  isMusicPlaying = false;
+  selectedGiftIndex = -1;
+
+  // --- PRIVATE VARS (ANIMATION, AUDIO) ---
+  private snowflakes: Snowflake[] = [];
+  private animationId?: number;
+  private snowInterval?: any;
+  private typingInterval?: any;
+  private cursorInterval?: any;
+  private countdownInterval?: any;
+
+  private howlerMusic?: HTMLAudioElement;
+  private bgMusic?: HTMLAudioElement;
   private audioCtx: AudioContext | null = null;
-  private SOUND_BELL = '/assets/sound/bell.wav'; private SOUND_SANTA = '/assets/sound/santa.mp3'; private BG_XMAS_MUSIC = '/assets/sound/christmas.mp3';
-  private audioBuffers: { [k: string]: AudioBuffer | null } = { bell: null, boom: null, santa: null };
+
+  // [UPDATE 1] Khai báo đường dẫn âm thanh mới
+  private SOUND_BELL = '/assets/sound/bell.wav';
+  private SOUND_SANTA = '/assets/sound/santa.mp3';
+  private SOUND_COLLECTED = '/assets/sound/collected.wav';
+  private BG_XMAS_MUSIC = '/assets/sound/christmas.mp3';
+
+  // [UPDATE 2] Thêm key 'collected' vào buffer
+  private audioBuffers: { [k: string]: AudioBuffer | null } = { bell: null, boom: null, santa: null, collected: null };
+
+  // Fireworks Vars
+  private fwCanvas?: HTMLCanvasElement; private fwCtx?: CanvasRenderingContext2D | null; private fwAnimId?: number; private fwParticles: any[] = []; private fwActive = false;
 
   public cards: ChristmasCard[] = [
     { id: 1, theme: 'santa', color: 'linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%)', icon: '🎅', title: 'Merry Christmas!', message: 'Chúc bạn có một mùa Giáng sinh ấm áp bên gia đình và người thân!', decorations: ['❄️', '🎄', '⭐', '🎁'] },
@@ -51,16 +101,18 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     { id: 20, theme: 'love', color: 'linear-gradient(135deg, #ff7675 0%, #d63031 100%)', icon: '❤️', title: 'Love & Peace', message: 'Chúc trái tim bạn luôn đong đầy tình yêu thương và sự an yên.', decorations: ['❤️', '💌', '🌹', '✨'] }
   ];
 
-  // Fireworks
-  private fwCanvas?: HTMLCanvasElement; private fwCtx?: CanvasRenderingContext2D | null; private fwAnimId?: number; private fwParticles: any[] = []; private fwActive = false;
-
   constructor(@Inject(PLATFORM_ID) private platformId: Object, private ngZone: NgZone, private cdr: ChangeDetectorRef, private renderer: Renderer2) {
     this.isBrowser = isPlatformBrowser(this.platformId);
   }
 
   ngOnInit() {
-    this.calculateCountdown(); this.generateCalendarData();
-    if (this.isBrowser) { this.loadProgress(); this.restoreSessionState(); }
+    this.calculateCountdown();
+    this.generateCalendarData();
+    this.initMilestones();
+    if (this.isBrowser) {
+      this.loadProgress();
+      this.restoreSessionState();
+    }
   }
 
   ngAfterViewInit() {
@@ -79,6 +131,128 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     this.stopFireworks(); this.snowflakes = [];
   }
 
+  // --- LOGIC MỐC SƯU TẦM ---
+
+  initMilestones() {
+    this.milestones = [
+      { level: 5, icon: '🍪', name: 'Nhà Sưu Tầm Tập Sự', description: 'Bạn đã thu thập được 5 mảnh ghép mùa đông!', isUnlocked: false, isClaimed: false },
+      { level: 10, icon: '🧦', name: 'Chiếc Tất May Mắn', description: 'Đã đi được 1/3 chặng đường rồi!', isUnlocked: false, isClaimed: false },
+      { level: 15, icon: '🦌', name: 'Bạn Của Tuần Lộc', description: 'Sự kiên trì của bạn thật đáng nể.', isUnlocked: false, isClaimed: false },
+      { level: 20, icon: '☃️', name: 'Người Tuyết Vui Vẻ', description: 'Chỉ còn một chút nữa thôi!', isUnlocked: false, isClaimed: false },
+      { level: 25, icon: '👑', name: 'HUYỀN THOẠI GIÁNG SINH', description: 'Chúc mừng! Bạn đã hoàn thành bộ sưu tập tháng 12!', isUnlocked: false, isClaimed: false, specialEffect: true }
+    ];
+  }
+
+  checkMilestonesProgress(isInteractive: boolean = false) {
+    this.collectedCount = this.calendarDays.filter(d => d.isOpen).length;
+    let hasChanges = false;
+    this.milestones.forEach(m => {
+      if (this.collectedCount >= m.level && !m.isUnlocked) {
+        m.isUnlocked = true;
+        hasChanges = true;
+        if (isInteractive) {
+          this.triggerRewardPopup(m);
+        }
+      }
+    });
+    if (hasChanges) {
+      this.saveProgress();
+      this.cdr.markForCheck();
+    }
+  }
+
+  triggerRewardPopup(m: CollectionMilestone) {
+    this.currentReward = m;
+    this.showRewardPopup = true;
+    // [UPDATE 4] Dùng âm thanh collected thay cho bell
+    this.playSFX('collected');
+    this.createConfetti();
+  }
+
+  claimReward(m: CollectionMilestone) {
+    if (!m.isUnlocked || m.isClaimed) return;
+
+    this.playSFX('click');
+    m.isClaimed = true;
+    this.currentReward = m;
+    this.showRewardPopup = true;
+    this.saveProgress();
+
+    if (m.specialEffect) {
+      this.tryPlayMusic();
+      this.triggerFireworks({ bursts: 15, duration: 8000, strong: true });
+    } else {
+      this.createConfetti();
+      this.createSparkles();
+      // [UPDATE 4] Dùng âm thanh collected thay cho bell
+      this.playSFX('collected');
+    }
+  }
+
+  closeRewardPopup() {
+    this.showRewardPopup = false;
+    this.currentReward = null;
+    this.playSFX('click');
+  }
+
+  // --- LOGIC LỊCH & SAVE/LOAD ---
+
+  loadProgress() {
+    if (!this.isBrowser) return;
+    try {
+      const d = JSON.parse(localStorage.getItem('christmas_opened_days') || '[]');
+      this.calendarDays.forEach(day => { if (d.includes(day.day)) day.isOpen = true; });
+      const mSaved = JSON.parse(localStorage.getItem('christmas_milestones') || '[]');
+      if (mSaved.length > 0) {
+        this.milestones.forEach(milestone => {
+          const saved = mSaved.find((x: any) => x.level === milestone.level);
+          if (saved) milestone.isClaimed = saved.isClaimed;
+        });
+      }
+      this.checkMilestonesProgress(false);
+    } catch (e) { console.warn(e); }
+  }
+
+  saveProgress() {
+    if (!this.isBrowser) return;
+    try {
+      localStorage.setItem('christmas_opened_days', JSON.stringify(this.calendarDays.filter(d => d.isOpen).map(d => d.day)));
+      const milestoneState = this.milestones.map(m => ({ level: m.level, isClaimed: m.isClaimed }));
+      localStorage.setItem('christmas_milestones', JSON.stringify(milestoneState));
+    } catch (e) { console.warn(e); }
+  }
+
+  openCalendarDoor(d: CalendarDay) {
+    if (d.isLocked) {
+      this.playSFX('locked');
+      d.isShaking = true;
+      setTimeout(() => { if (!this.isDestroyed) { d.isShaking = false; this.cdr.markForCheck(); } }, 500);
+      return;
+    }
+    if (d.isOpen) {
+      this.playSFX('click');
+      this.selectedCalendarItem = d;
+      this.showCalendarPopup = true;
+      return;
+    }
+
+    this.playSFX('open');
+    d.isOpen = true;
+    this.selectedCalendarItem = d;
+    this.showCalendarPopup = true;
+
+    if (d.day === 24) { this.triggerReindeerFly(); this.playSFX('bell'); }
+    else if (d.day === 25) { this.triggerReindeerFly(); this.triggerFireworks({ bursts: 12, duration: 10000, strong: true }); this.playSFX('santa'); this.createSnow(60); }
+    else { this.createConfetti(); }
+
+    this.checkMilestonesProgress(true);
+    this.saveProgress();
+  }
+
+  closeCalendarPopup() { this.playSFX('click'); this.showCalendarPopup = false; this.selectedCalendarItem = null; }
+
+  // --- CÁC HÀM TIỆN ÍCH KHÁC ---
+
   restoreSessionState() {
     if (!this.isBrowser) return;
     const v = localStorage.getItem('christmas_current_view'), m = localStorage.getItem('christmas_music_on');
@@ -91,71 +265,22 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.isBrowser) localStorage.setItem('christmas_current_view', view);
   }
 
-  saveProgress() {
-    if (!this.isBrowser) return;
-    try {
-      localStorage.setItem('christmas_opened_days', JSON.stringify(this.calendarDays.filter(d => d.isOpen).map(d => d.day)));
-      this.updateCollectedCount();
-    } catch (e) { console.warn(e); }
-  }
-
-  loadProgress() {
-    if (!this.isBrowser) return;
-    try {
-      const d = JSON.parse(localStorage.getItem('christmas_opened_days') || '[]');
-      this.calendarDays.forEach(day => { if (d.includes(day.day)) day.isOpen = true; });
-      this.updateCollectedCount();
-    } catch (e) { console.warn(e); }
-  }
-
-  updateCollectedCount() { this.collectedCount = this.calendarDays.filter(d => d.isOpen).length; }
-
   generateCalendarData() {
     const items = [
       {t: "Chào Tháng 12", i: "❄️", m: "Gió lạnh về rồi, nhớ mặc thêm áo ấm khi ra đường nhé.", r: 'common'},
       {t: "Cốc Nước Ấm", i: "☕", m: "Thời tiết hanh khô, nhớ uống đủ nước để da dẻ luôn hồng hào.", r: 'common'},
-      {
-        t: "Giấc Ngủ Sớm",
-        i: "🌙",
-        m: "Đừng thức khuya chạy deadline quá, sức khỏe mới là món quà quý giá nhất.",
-        r: 'epic'
-      },
+      {t: "Giấc Ngủ Sớm", i: "🌙", m: "Đừng thức khuya chạy deadline quá, sức khỏe mới là món quà quý giá nhất.", r: 'epic'},
       {t: "Vitamin C", i: "🍊", m: "Ăn thêm chút hoa quả để tăng đề kháng, đừng để bị ốm nhé.", r: 'common'},
-      {
-        t: "Dọn Dẹp",
-        i: "🧹",
-        m: "F5 lại góc làm việc một chút, không gian thoáng đãng thì tâm trạng mới vui.",
-        r: 'common'
-      },
+      {t: "Dọn Dẹp", i: "🧹", m: "F5 lại góc làm việc một chút, không gian thoáng đãng thì tâm trạng mới vui.", r: 'common'},
       {t: "Lời nhắc", i: "📞", m: "Bạn quan trọng lắm. Nhớ đối xử tử tế với chính mình.", r: 'epic'},
-      {
-        t: "Cuối Tuần",
-        i: "🛌",
-        m: "Bạn đã vất vả cả tuần rồi, hôm nay hãy cho phép bản thân ngủ nướng thêm xíu.",
-        r: 'rare'
-      },
-      {
-        t: "Quyển Sách Hay",
-        i: "📖",
-        m: "Tạm rời xa điện thoại, đọc vài trang sách để tâm hồn tĩnh lặng hơn.",
-        r: 'epic'
-      },
+      {t: "Cuối Tuần", i: "🛌", m: "Bạn đã vất vả cả tuần rồi, hôm nay hãy cho phép bản thân ngủ nướng thêm xíu.", r: 'rare'},
+      {t: "Quyển Sách Hay", i: "📖", m: "Tạm rời xa điện thoại, đọc vài trang sách để tâm hồn tĩnh lặng hơn.", r: 'epic'},
       {t: "Kem Dưỡng Da", i: "🧴", m: "Đừng để đôi tay bị nứt nẻ, nhớ thoa kem dưỡng ẩm nhé.", r: 'common'},
       {t: "Bản Nhạc", i: "🎷", m: "Hôm nay là ngày hoàn hảo để nghe một bài nhạc Giáng Sinh nè.", r: 'rare'},
-      {
-        t: "Món Ngon",
-        i: "🍜",
-        m: "Đừng ăn uống qua loa, hôm nay hãy tự thưởng cho mình một bữa thật ngon.",
-        r: 'common'
-      },
+      {t: "Món Ngon", i: "🍜", m: "Đừng ăn uống qua loa, hôm nay hãy tự thưởng cho mình một bữa thật ngon.", r: 'common'},
       {t: "Nụ Cười", i: "😊", m: "Mỉm cười trước gương nào! Bạn xinh đẹp nhất khi bạn vui vẻ.", r: 'common'},
       {t: "Cafe Sáng", i: "☕", m: "Một chút cafein cho ngày mới tỉnh táo, cố gắng lên nhé!", r: 'rare'},
-      {
-        t: "Sổ Tay",
-        i: "✍️",
-        m: "Viết ra những điều làm bạn lo lắng, rồi gạch bỏ nó đi. Mọi chuyện sẽ ổn thôi.",
-        r: 'epic'
-      },
+      {t: "Sổ Tay", i: "✍️", m: "Viết ra những điều làm bạn lo lắng, rồi gạch bỏ nó đi. Mọi chuyện sẽ ổn thôi.", r: 'epic'},
       {t: "Đi Dạo", i: "👟", m: "Ra ngoài hít thở khí trời một chút, đừng ngồi lỳ trong phòng mãi thế.", r: 'legendary'},
       {t: "Tha Thứ", i: "🕊️", m: "Cuối năm rồi, chuyện buồn cũ hãy bỏ qua để đón những niềm vui mới.", r: 'common'},
       {t: "Tiết Kiệm", i: "🐷", m: "Mua sắm vừa đủ thôi, để dành một khoản nhỏ cho dự định năm sau nhé.", r: 'common'},
@@ -164,68 +289,17 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       {t: "Cái Ôm", i: "🫂", m: "Nếu mệt quá, hãy tìm một bờ vai tin cậy để dựa vào. Bạn không cô đơn đâu.", r: 'rare'},
       {t: "Lời Cảm Ơn", i: "💌", m: "Gửi lời cảm ơn đến những người đã giúp đỡ bạn trong năm qua.", r: 'common'},
       {t: "Tự Thưởng", i: "🎁", m: "Mua tặng bản thân một món quà nhỏ, vì bạn xứng đáng được yêu thương.", r: 'epic'},
-      {
-        t: "Bình Yên",
-        i: "✨",
-        m: "Mong rằng mọi bão giông sẽ dừng sau cánh cửa, trả lại cho bạn sự bình yên.",
-        r: 'epic'
-      }
+      {t: "Bình Yên", i: "✨", m: "Mong rằng mọi bão giông sẽ dừng sau cánh cửa, trả lại cho bạn sự bình yên.", r: 'epic'}
     ];
     this.emptySlots = [];
-    const now = new Date();
-    const cm = now.getMonth() + 1;
-    const cd = now.getDate();
+    const now = new Date(); const cm = now.getMonth() + 1; const cd = now.getDate();
     for (let i = 1; i <= 31; i++) {
       let d = items[(i - 1) % items.length], r = d.r as any;
-      // --- LỜI CHÚC ĐẶC BIỆT ---
-      if (i === 24) {
-        d = {
-          t: "Đêm Thánh Vô Cùng",
-          i: "🌙",
-          m: "Đêm nay,nguyện cầu cho bạn tìm thấy một góc bình yên sâu thẳm trong tâm hồn, cảm nhận được hơi ấm từ những người thương yêu nhất. Merry Christmas Eve!",
-          r: 'legendary'
-        };
-        r = 'legendary';
-      }
-
-      if (i === 25) {
-        d = {
-          t: "MERRY CHRISTMAS!",
-          i: "🎅",
-          m: "Giáng sinh đã thực sự gõ cửa rồi! Cảm ơn bạn vì đã luôn kiên cường, nỗ lực và tử tế trong suốt một năm đầy biến động vừa qua.Sự hiện diện của bạn chính là món quà tuyệt vời nhất của thế giới này. Chúc cuộc sống của bạn luôn rực rỡ như ánh đèn lễ hội, ngọt ngào như ly cacao nóng và ngập tràn tiếng cười hạnh phúc. Chúc mừng Giáng sinh an lành!",
-          r: 'legendary'
-        };
-        r = 'legendary';
-      }
-      this.calendarDays.push({
-        day: i,
-        isOpen: false,
-        isLocked: (cm === 12 && i > cd),
-        isShaking: false,
-        content: d.m,
-        image: d.i,
-        title: d.t,
-        type: i === 25 ? 'gift' : 'message',
-        rarity: r
-      });
-      //   const testLocked = (i === 24 || i === 25) ? false : (cm === 12 && i > cd);
-      //
-      //   this.calendarDays.push({ day: i, isOpen: false, isLocked: testLocked, isShaking: false, content: d.m, image: d.i, title: d.t, type: i === 25 ? 'gift' : 'message', rarity: r });
-      // }
+      if (i === 24) { d = { t: "Đêm Thánh Vô Cùng", i: "🌙", m: "Đêm nay, nguyện cầu cho bạn tìm thấy một góc bình yên. Merry Christmas Eve!", r: 'legendary' }; r = 'legendary'; }
+      if (i === 25) { d = { t: "MERRY CHRISTMAS!", i: "🎅", m: "Giáng sinh đã thực sự gõ cửa rồi! Cảm ơn bạn vì đã luôn kiên cường...", r: 'legendary' }; r = 'legendary'; }
+      this.calendarDays.push({ day: i, isOpen: false, isLocked: (cm === 12 && i > cd), isShaking: false, content: d.m, image: d.i, title: d.t, type: i === 25 ? 'gift' : 'message', rarity: r });
     }
   }
-
-  openCalendarDoor(d: CalendarDay) {
-    if (d.isLocked) { this.playSFX('locked'); d.isShaking = true; setTimeout(() => { if (!this.isDestroyed) { d.isShaking = false; this.cdr.markForCheck(); } }, 500); return; }
-    if (d.isOpen) { this.playSFX('click'); this.selectedCalendarItem = d; this.showCalendarPopup = true; return; }
-    this.playSFX('open');
-    if (d.day === 24) { this.triggerReindeerFly(); this.playSFX('bell'); }
-    else if (d.day === 25) { this.triggerReindeerFly(); this.triggerFireworks({ bursts: 12, duration: 10000, strong: true }); this.playSFX('santa'); this.createSnow(60); }
-    else { this.createConfetti(); }
-    d.isOpen = true; this.selectedCalendarItem = d; this.showCalendarPopup = true; this.updateCollectedCount(); this.saveProgress();
-  }
-
-  closeCalendarPopup() { this.playSFX('click'); this.showCalendarPopup = false; this.selectedCalendarItem = null; }
 
   triggerReindeerFly() {
     this.showReindeerFly = false;
@@ -244,7 +318,12 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.isBrowser) return;
     try { const A = window.AudioContext || (window as any).webkitAudioContext; if (A) this.audioCtx = new A(); } catch (e) { this.audioCtx = null; }
     this.howlerMusic = new Audio(this.BG_XMAS_MUSIC); this.howlerMusic.loop = true; this.howlerMusic.volume = 0.35;
-    if (this.audioCtx) { this.loadAudioBuffer(this.SOUND_BELL, 'bell'); this.loadAudioBuffer(this.SOUND_SANTA, 'santa'); }
+    if (this.audioCtx) {
+      this.loadAudioBuffer(this.SOUND_BELL, 'bell');
+      this.loadAudioBuffer(this.SOUND_SANTA, 'santa');
+      // [UPDATE 3] Load âm thanh collected
+      this.loadAudioBuffer(this.SOUND_COLLECTED, 'collected');
+    }
   }
 
   toggleMusic() {
@@ -258,7 +337,6 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.isBrowser || !this.howlerMusic) return;
     try { await this.howlerMusic.play(); this.isMusicPlaying = true; this.cdr.markForCheck(); localStorage.setItem('christmas_music_on', 'true'); }
     catch (e) {
-      console.log('Autoplay blocked');
       const rm = this.renderer.listen('document', 'click', () => {
         this.howlerMusic?.play().then(() => { this.isMusicPlaying = true; this.cdr.markForCheck(); localStorage.setItem('christmas_music_on', 'true'); });
         if (this.audioCtx?.state === 'suspended') this.audioCtx.resume(); rm();
@@ -266,22 +344,26 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private async loadAudioBuffer(url: string, k: 'bell' | 'boom' | 'santa') {
+  private async loadAudioBuffer(url: string, k: 'bell' | 'boom' | 'santa' | 'collected') {
     if (!this.audioCtx) return;
     try { const r = await fetch(url), b = await this.audioCtx.decodeAudioData(await r.arrayBuffer()); this.audioBuffers[k] = b; } catch (e) { this.audioBuffers[k] = null; }
   }
 
-  private playBuffer(k: 'bell'|'boom'|'santa', o: { gain?: number; playbackRate?: number } = {}) {
+  private playBuffer(k: 'bell'|'boom'|'santa'|'collected', o: { gain?: number; playbackRate?: number } = {}) {
     if (!this.isBrowser) return;
     if (!this.audioCtx || !this.audioBuffers[k]) { const a = new Audio(k==='santa'?this.SOUND_SANTA:this.SOUND_BELL); if(k==='santa') a.volume=1; a.play().catch(()=>{}); return; }
     const s = this.audioCtx.createBufferSource(), g = this.audioCtx.createGain();
     s.buffer = this.audioBuffers[k]; if (o.playbackRate) s.playbackRate.value = o.playbackRate;
-    g.gain.value = o.gain ?? (k === 'santa' ? 0.8 : 0.4); s.connect(g); g.connect(this.audioCtx.destination); s.start();
+    g.gain.value = o.gain ?? (k === 'santa' ? 0.8 : (k === 'collected' ? 0.6 : 0.4)); s.connect(g); g.connect(this.audioCtx.destination); s.start();
   }
 
   playSFX(t: string) {
     if (!this.isBrowser) return; if(!this.audioCtx) this.initAudioSystem();
-    if (t === 'bell' || t === 'santa') { this.playBuffer(t as any, { gain: t==='santa'?1:0.5 }); return; }
+    // [UPDATE 4] Thêm 'collected' vào logic phát
+    if (t === 'bell' || t === 'santa' || t === 'collected') {
+      this.playBuffer(t as any, { gain: t==='santa'?1 : (t==='collected'?0.6:0.5) });
+      return;
+    }
     const c = this.audioCtx; if (!c) return; const n = c.currentTime;
     if (t === 'click') { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(800, n); o.frequency.exponentialRampToValueAtTime(100, n+0.05); g.gain.setValueAtTime(0.3, n); g.gain.exponentialRampToValueAtTime(0.001, n+0.05); o.connect(g); g.connect(c.destination); o.start(); o.stop(n+0.05); }
     if (t==='locked') { const o = c.createOscillator(), g = c.createGain(); o.type='sawtooth'; o.frequency.value=160; g.gain.value=0.12; o.connect(g); g.connect(c.destination); o.start(); o.stop(n+0.16); }
@@ -289,19 +371,28 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     if (t === 'firework') { const o = c.createOscillator(), g = c.createGain(); o.type = 'square'; o.frequency.setValueAtTime(150, n); o.frequency.exponentialRampToValueAtTime(40, n+0.1); g.gain.setValueAtTime(0.1, n); g.gain.exponentialRampToValueAtTime(0.01, n+0.1); o.connect(g); g.connect(c.destination); o.start(); o.stop(n+0.15); }
   }
 
-  playClick() { this.playSFX('click'); } playHover() { /* opt */ }
+  playClick() { this.playSFX('click'); }
+  playHover() { /* opt */ }
+
   startCursorBlink() { if (this.isBrowser) this.cursorInterval = setInterval(() => { this.showCursor = !this.showCursor; this.cdr.markForCheck(); }, 500); }
+
   startTypingEffect(m: string) { this.typingText = ''; let i = 0; if (this.typingInterval) clearInterval(this.typingInterval); this.typingInterval = setInterval(() => { if (i < m.length) { this.typingText += m[i++]; this.cdr.markForCheck(); } else clearInterval(this.typingInterval); }, 40); }
+
   revealGifts() { this.playClick(); this.showGifts = true; this.tryPlayMusic(); }
+
   openCard(i: number) { this.playClick(); this.selectedGiftIndex = i; this.isOpening = true; this.currentCard = this.cards[Math.floor(Math.random()*this.cards.length)]; setTimeout(() => { if (!this.isDestroyed) { this.isOpening = false; this.showCard = true; setTimeout(() => { if (!this.isDestroyed) { if (this.currentCard) this.startTypingEffect(this.currentCard.message); this.createConfetti(); this.createSparkles(); } }, 100); } }, 800); }
+
   resetCard() { this.playClick(); this.showCard = false; this.showGifts = true; this.currentCard = null; this.typingText = ''; if (this.typingInterval) clearInterval(this.typingInterval); }
 
   createConfetti() {
     if (!this.isBrowser) return; const clr = ['#ff6b6b', '#ffd700', '#4ecdc4', '#ff69b4', '#00ff00', '#00bfff'];
     for (let i = 0; i < 150; i++) setTimeout(() => { if (this.isDestroyed) return; const c = document.createElement('div'); c.className = 'confetti'; c.style.cssText = `position:fixed;width:${Math.random()*10+5}px;height:${Math.random()*10+5}px;background-color:${clr[Math.random()*clr.length|0]};left:${Math.random()*100}vw;top:-20px;transform:rotate(${Math.random()*360}deg);animation:confettiFall ${2+Math.random()*2}s ease-out forwards;pointer-events:none;z-index:99999;border-radius:${Math.random()>0.5?'50%':'0'};`; document.body.appendChild(c); setTimeout(() => c.remove(), 4000); }, i * 10);
   }
+
   createSparkles() { if (!this.isBrowser) return; for (let i = 0; i < 30; i++) setTimeout(() => { if (this.isDestroyed) return; const s = document.createElement('div'); s.innerHTML = '✨'; s.style.cssText = `position:fixed;left:${50+(Math.random()-0.5)*30}%;top:${50+(Math.random()-0.5)*30}%;font-size:${20+Math.random()*20}px;pointer-events:none;z-index:100000;animation:sparkleBurst 1.5s ease-out forwards;`; document.body.appendChild(s); setTimeout(() => s.remove(), 1500); }, i * 30); }
+
   createSnow(c: number) { if (!this.isBrowser) return; const ct = document.getElementById('snow-container'); if (!ct) return; const sh = ['❄️', '❅', '❆']; for (let i = 0; i < c; i++) { const d = document.createElement('div'); d.className = 'snowflake'; d.innerHTML = sh[Math.random()*sh.length|0]; const x = Math.random()*100, y = -10-Math.random()*20; d.style.cssText = `position:absolute;left:${x}vw;top:${y}vh;font-size:${15+Math.random()*15}px;opacity:${0.6+Math.random()*0.4};color:white;pointer-events:none;z-index:9998;`; ct.appendChild(d); this.snowflakes.push({ element: d, x, y, speed: 0.3+Math.random()*0.6, rotation: Math.random()*360, rotationSpeed: (Math.random()-0.5)*2 }); } if (!this.snowInterval) this.snowInterval = setInterval(() => { if (!this.isDestroyed && this.snowflakes.length < 80) this.createSnow(3); }, 3500); }
+
   startSnowAnimation() { if (!this.isBrowser) return; const anim = () => { if (this.isDestroyed) return; for (let i = this.snowflakes.length - 1; i >= 0; i--) { const s = this.snowflakes[i]; s.y += s.speed; s.rotation += s.rotationSpeed; s.element.style.transform = `translate(${Math.sin(s.y * 0.085) * 2}px, ${s.y}vh) rotate(${s.rotation}deg)`; if (s.y > 120) { s.element.remove(); this.snowflakes.splice(i, 1); } } this.animationId = requestAnimationFrame(anim); }; anim(); }
 
   private setupFireworksCanvas() { if (!this.isBrowser || (this.fwCanvas && this.fwCtx)) return; this.fwCanvas = document.getElementById('fireworks-canvas') as HTMLCanvasElement; if (!this.fwCanvas) return; this.fwCtx = this.fwCanvas.getContext('2d'); this.resizeCanvas(); window.addEventListener('resize', this.resizeCanvasBound); }
