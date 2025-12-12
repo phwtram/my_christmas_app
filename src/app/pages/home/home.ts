@@ -1,18 +1,8 @@
-import { Component, OnInit, AfterViewInit, OnDestroy, Inject, PLATFORM_ID, NgZone, ChangeDetectorRef, Renderer2 } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, Inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
 import { isPlatformBrowser, NgIf, NgFor, NgClass, UpperCasePipe } from '@angular/common';
-
-interface Snowflake { element: HTMLDivElement; x: number; y: number; speed: number; rotation: number; rotationSpeed: number; }
-interface ChristmasCard { id: number; theme: string; color: string; icon: string; title: string; message: string; decorations: string[]; }
-interface CalendarDay { day: number; isOpen: boolean; isLocked: boolean; isShaking: boolean; content: string; image: string; title: string; type: 'gift'|'message'|'song'; rarity: 'common'|'rare'|'epic'|'legendary'; }
-interface CollectionMilestone {
-  level: number;
-  icon: string;
-  name: string;
-  description: string;
-  isUnlocked: boolean;
-  isClaimed: boolean;
-  specialEffect?: boolean;
-}
+import { ChristmasCard, CalendarDay, CollectionMilestone } from '../../models/christmas.model';
+import { AudioService } from '../../services/audio.service';
+import { EffectService } from '../../services/effect.service';
 
 @Component({
   selector: 'app-home',
@@ -54,29 +44,9 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   isMusicPlaying = false;
   selectedGiftIndex = -1;
 
-  // --- PRIVATE VARS (ANIMATION, AUDIO) ---
-  private snowflakes: Snowflake[] = [];
-  private animationId?: number;
-  private snowInterval?: any;
   private typingInterval?: any;
   private cursorInterval?: any;
   private countdownInterval?: any;
-
-  private howlerMusic?: HTMLAudioElement;
-  private bgMusic?: HTMLAudioElement;
-  private audioCtx: AudioContext | null = null;
-
-  // [UPDATE 1] Khai báo đường dẫn âm thanh mới
-  private SOUND_BELL = '/assets/sound/bell.wav';
-  private SOUND_SANTA = '/assets/sound/santa.mp3';
-  private SOUND_COLLECTED = '/assets/sound/collected.wav';
-  private BG_XMAS_MUSIC = '/assets/sound/christmas.mp3';
-
-  // [UPDATE 2] Thêm key 'collected' vào buffer
-  private audioBuffers: { [k: string]: AudioBuffer | null } = { bell: null, boom: null, santa: null, collected: null };
-
-  // Fireworks Vars
-  private fwCanvas?: HTMLCanvasElement; private fwCtx?: CanvasRenderingContext2D | null; private fwAnimId?: number; private fwParticles: any[] = []; private fwActive = false;
 
   public cards: ChristmasCard[] = [
     { id: 1, theme: 'santa', color: 'linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%)', icon: '🎅', title: 'Merry Christmas!', message: 'Chúc bạn có một mùa Giáng sinh ấm áp bên gia đình và người thân!', decorations: ['❄️', '🎄', '⭐', '🎁'] },
@@ -101,11 +71,17 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     { id: 20, theme: 'love', color: 'linear-gradient(135deg, #ff7675 0%, #d63031 100%)', icon: '❤️', title: 'Love & Peace', message: 'Chúc trái tim bạn luôn đong đầy tình yêu thương và sự an yên.', decorations: ['❤️', '💌', '🌹', '✨'] }
   ];
 
-  constructor(@Inject(PLATFORM_ID) private platformId: Object, private ngZone: NgZone, private cdr: ChangeDetectorRef, private renderer: Renderer2) {
+  constructor(
+    @Inject(PLATFORM_ID) private platformId: Object,
+    private cdr: ChangeDetectorRef,
+    private audioService: AudioService,
+    private effectService: EffectService
+  ) {
     this.isBrowser = isPlatformBrowser(this.platformId);
   }
 
   ngOnInit() {
+    this.audioService.init(); // Khởi tạo âm thanh
     this.calculateCountdown();
     this.generateCalendarData();
     this.initMilestones();
@@ -117,18 +93,27 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit() {
     if (!this.isBrowser) return;
-    this.initAudioSystem();
-    if (this.isMusicPlaying) setTimeout(() => this.tryPlayMusic(), 500);
-    this.startCountdown(); this.startCursorBlink();
-    setTimeout(() => { if (!this.isDestroyed) { this.createSnow(30); this.startSnowAnimation(); } }, 200);
+
+    if (this.isMusicPlaying) setTimeout(() => this.audioService.tryPlayMusic(), 500);
+    this.startCountdown();
+    this.startCursorBlink();
+
+    setTimeout(() => {
+      if (!this.isDestroyed) {
+        this.effectService.destroy();
+
+        this.effectService.createSnow(30);
+        this.effectService.startSnowAnimation();
+        this.cdr.detectChanges();
+      }
+    }, 200);
   }
 
   ngOnDestroy() {
     this.isDestroyed = true;
-    if (this.animationId && this.isBrowser) cancelAnimationFrame(this.animationId);
-    [this.snowInterval, this.countdownInterval, this.typingInterval, this.cursorInterval].forEach(i => i && clearInterval(i));
-    if (this.bgMusic) { this.bgMusic.pause(); this.bgMusic = undefined; }
-    this.stopFireworks(); this.snowflakes = [];
+    [this.countdownInterval, this.typingInterval, this.cursorInterval].forEach(i => i && clearInterval(i));
+    this.effectService.destroy();
+    this.audioService.stopMusic();
   }
 
   // --- LOGIC MỐC SƯU TẦM ---
@@ -164,38 +149,34 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   triggerRewardPopup(m: CollectionMilestone) {
     this.currentReward = m;
     this.showRewardPopup = true;
-    // [UPDATE 4] Dùng âm thanh collected thay cho bell
-    this.playSFX('collected');
-    this.createConfetti();
+    this.audioService.playSFX('collected');
+    this.effectService.createConfetti();
   }
 
   claimReward(m: CollectionMilestone) {
     if (!m.isUnlocked || m.isClaimed) return;
 
-    this.playSFX('click');
+    this.audioService.playSFX('click');
     m.isClaimed = true;
     this.currentReward = m;
     this.showRewardPopup = true;
     this.saveProgress();
 
     if (m.specialEffect) {
-      this.tryPlayMusic();
-      this.triggerFireworks({ bursts: 15, duration: 8000, strong: true });
+      this.audioService.tryPlayMusic();
+      this.effectService.triggerFireworks((name) => this.audioService.playSFX(name), { bursts: 15, duration: 8000, strong: true });
     } else {
-      this.createConfetti();
-      this.createSparkles();
-      // [UPDATE 4] Dùng âm thanh collected thay cho bell
-      this.playSFX('collected');
+      this.effectService.createConfetti();
+      this.effectService.createSparkles();
+      this.audioService.playSFX('collected');
     }
   }
 
   closeRewardPopup() {
     this.showRewardPopup = false;
     this.currentReward = null;
-    this.playSFX('click');
+    this.audioService.playSFX('click');
   }
-
-  // --- LOGIC LỊCH & SAVE/LOAD ---
 
   loadProgress() {
     if (!this.isBrowser) return;
@@ -224,45 +205,85 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
   openCalendarDoor(d: CalendarDay) {
     if (d.isLocked) {
-      this.playSFX('locked');
+      this.audioService.playSFX('locked');
       d.isShaking = true;
       setTimeout(() => { if (!this.isDestroyed) { d.isShaking = false; this.cdr.markForCheck(); } }, 500);
       return;
     }
     if (d.isOpen) {
-      this.playSFX('click');
+      this.audioService.playSFX('click');
       this.selectedCalendarItem = d;
       this.showCalendarPopup = true;
       return;
     }
 
-    this.playSFX('open');
+    this.audioService.playSFX('open');
     d.isOpen = true;
     this.selectedCalendarItem = d;
     this.showCalendarPopup = true;
 
-    if (d.day === 24) { this.triggerReindeerFly(); this.playSFX('bell'); }
-    else if (d.day === 25) { this.triggerReindeerFly(); this.triggerFireworks({ bursts: 12, duration: 10000, strong: true }); this.playSFX('santa'); this.createSnow(60); }
-    else { this.createConfetti(); }
+    if (d.day === 24) {
+      this.triggerReindeerFly();
+      this.audioService.playSFX('bell');
+    }
+    else if (d.day === 25) {
+      this.triggerReindeerFly();
+      this.showFireworks = true;
+      this.cdr.detectChanges();
+      setTimeout(() => {
+        if (!this.isDestroyed) {
+          this.effectService.triggerFireworks(
+            (name) => this.audioService.playSFX(name as any),
+            { bursts: 12, duration: 10000, strong: true }
+          );
+        }
+      }, 50);
+
+      this.audioService.playSFX('santa');
+      this.effectService.createSnow(60);
+
+      // BƯỚC 3: Tự động tắt sau 10.5 giây
+      setTimeout(() => {
+        if (!this.isDestroyed) {
+          this.showFireworks = false;
+          this.cdr.markForCheck();
+        }
+      }, 10500);
+    }
+    else {
+      this.effectService.createConfetti();
+    }
 
     this.checkMilestonesProgress(true);
     this.saveProgress();
   }
 
-  closeCalendarPopup() { this.playSFX('click'); this.showCalendarPopup = false; this.selectedCalendarItem = null; }
-
+  closeCalendarPopup() {
+    this.audioService.playSFX('click');
+    this.showCalendarPopup = false;
+    this.selectedCalendarItem = null;
+  }
   // --- CÁC HÀM TIỆN ÍCH KHÁC ---
-
   restoreSessionState() {
     if (!this.isBrowser) return;
-    const v = localStorage.getItem('christmas_current_view'), m = localStorage.getItem('christmas_music_on');
-    if (v === 'gifts' || v === 'calendar') this.currentView = v;
+    const v = localStorage.getItem('christmas_current_view');
+    if (v === 'gifts' || v === 'calendar' || v === 'collection') {
+      this.currentView = v;
+    }
+
+    const m = localStorage.getItem('christmas_music_on');
     this.isMusicPlaying = (m === 'true' || m === null);
+    this.audioService.setMusicState(this.isMusicPlaying);
   }
 
   switchView(view: any) {
-    this.playSFX('click'); this.currentView = view;
+    this.audioService.playSFX('click');
+    this.currentView = view;
     if (this.isBrowser) localStorage.setItem('christmas_current_view', view);
+  }
+
+  toggleMusic() {
+    this.isMusicPlaying = this.audioService.toggleMusic();
   }
 
   generateCalendarData() {
@@ -295,8 +316,27 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     const now = new Date(); const cm = now.getMonth() + 1; const cd = now.getDate();
     for (let i = 1; i <= 31; i++) {
       let d = items[(i - 1) % items.length], r = d.r as any;
-      if (i === 24) { d = { t: "Đêm Thánh Vô Cùng", i: "🌙", m: "Đêm nay, nguyện cầu cho bạn tìm thấy một góc bình yên. Merry Christmas Eve!", r: 'legendary' }; r = 'legendary'; }
-      if (i === 25) { d = { t: "MERRY CHRISTMAS!", i: "🎅", m: "Giáng sinh đã thực sự gõ cửa rồi! Cảm ơn bạn vì đã luôn kiên cường...", r: 'legendary' }; r = 'legendary'; }
+      if (i === 24) {
+        d = {
+          t: "Đêm Thánh Vô Cùng",
+          i: "🌙",
+          m: "Đêm nay, khi tiếng chuông nhà thờ ngân vang giữa trời đông lạnh giá, hãy để mọi âu lo, muộn phiền của năm cũ lặng lẽ tan biến vào màn đêm. Nguyện cầu cho bạn tìm thấy một góc bình yên sâu thẳm trong tâm hồn, cảm nhận được hơi ấm từ những người thương yêu nhất. Hãy nhắm mắt lại, hít thật sâu và tin rằng: Ngày mai nắng sẽ lên, và những điều tốt đẹp nhất đang chờ bạn phía trước. Merry Christmas Eve!",
+          r: 'legendary'
+        };
+        r = 'legendary';
+      }
+
+      if (i === 25) {
+        d = {
+          t: "MERRY CHRISTMAS!",
+          i: "🎅",
+          m: "Giáng sinh đã thực sự gõ cửa rồi! Cảm ơn bạn vì đã luôn kiên cường, nỗ lực và tử tế trong suốt một năm đầy biến động vừa qua. Bạn biết không, sự hiện diện của bạn chính là món quà tuyệt vời nhất của thế giới này. Chúc cuộc sống của bạn luôn rực rỡ như ánh đèn lễ hội, ngọt ngào như ly cacao nóng và ngập tràn tiếng cười hạnh phúc. Chúc mừng Giáng sinh an lành!",
+          r: 'legendary'
+        };
+        r = 'legendary';
+      }
+      // const isLocked = (i === 24 || i === 25) ? false : (cm === 12 && i > cd);
+      // this.calendarDays.push({ day: i, isOpen: false, isLocked: isLocked, isShaking: false, content: d.m, image: d.i, title: d.t, type: i === 25 ? 'gift' : 'message', rarity: r });
       this.calendarDays.push({ day: i, isOpen: false, isLocked: (cm === 12 && i > cd), isShaking: false, content: d.m, image: d.i, title: d.t, type: i === 25 ? 'gift' : 'message', rarity: r });
     }
   }
@@ -307,100 +347,18 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     setTimeout(() => { if (!this.isDestroyed) { this.showReindeerFly = false; this.cdr.markForCheck(); } }, 9000);
   }
 
-  triggerFireworks(opts: { bursts?: number; duration?: number; strong?: boolean } = {}) {
-    if (!this.isBrowser) return;
-    this.showFireworks = true; this.cdr.markForCheck();
-    setTimeout(() => { if (!this.isDestroyed) { this.setupFireworksCanvas(); this.startFireworks(opts.bursts ?? 8, opts.strong ?? false); } }, 50);
-    setTimeout(() => { if (!this.isDestroyed) { this.stopFireworks(); this.showFireworks = false; this.cdr.markForCheck(); } }, (opts.duration ?? 6000) + 500);
-  }
-
-  initAudioSystem() {
-    if (!this.isBrowser) return;
-    try { const A = window.AudioContext || (window as any).webkitAudioContext; if (A) this.audioCtx = new A(); } catch (e) { this.audioCtx = null; }
-    this.howlerMusic = new Audio(this.BG_XMAS_MUSIC); this.howlerMusic.loop = true; this.howlerMusic.volume = 0.35;
-    if (this.audioCtx) {
-      this.loadAudioBuffer(this.SOUND_BELL, 'bell');
-      this.loadAudioBuffer(this.SOUND_SANTA, 'santa');
-      // [UPDATE 3] Load âm thanh collected
-      this.loadAudioBuffer(this.SOUND_COLLECTED, 'collected');
-    }
-  }
-
-  toggleMusic() {
-    if (!this.isBrowser) return; if (!this.howlerMusic) this.initAudioSystem();
-    if (this.isMusicPlaying) { this.howlerMusic?.pause(); this.isMusicPlaying = false; }
-    else { this.howlerMusic?.play().catch(()=>{}); this.isMusicPlaying = true; }
-    localStorage.setItem('christmas_music_on', String(this.isMusicPlaying));
-  }
-
-  async tryPlayMusic() {
-    if (!this.isBrowser || !this.howlerMusic) return;
-    try { await this.howlerMusic.play(); this.isMusicPlaying = true; this.cdr.markForCheck(); localStorage.setItem('christmas_music_on', 'true'); }
-    catch (e) {
-      const rm = this.renderer.listen('document', 'click', () => {
-        this.howlerMusic?.play().then(() => { this.isMusicPlaying = true; this.cdr.markForCheck(); localStorage.setItem('christmas_music_on', 'true'); });
-        if (this.audioCtx?.state === 'suspended') this.audioCtx.resume(); rm();
-      });
-    }
-  }
-
-  private async loadAudioBuffer(url: string, k: 'bell' | 'boom' | 'santa' | 'collected') {
-    if (!this.audioCtx) return;
-    try { const r = await fetch(url), b = await this.audioCtx.decodeAudioData(await r.arrayBuffer()); this.audioBuffers[k] = b; } catch (e) { this.audioBuffers[k] = null; }
-  }
-
-  private playBuffer(k: 'bell'|'boom'|'santa'|'collected', o: { gain?: number; playbackRate?: number } = {}) {
-    if (!this.isBrowser) return;
-    if (!this.audioCtx || !this.audioBuffers[k]) { const a = new Audio(k==='santa'?this.SOUND_SANTA:this.SOUND_BELL); if(k==='santa') a.volume=1; a.play().catch(()=>{}); return; }
-    const s = this.audioCtx.createBufferSource(), g = this.audioCtx.createGain();
-    s.buffer = this.audioBuffers[k]; if (o.playbackRate) s.playbackRate.value = o.playbackRate;
-    g.gain.value = o.gain ?? (k === 'santa' ? 0.8 : (k === 'collected' ? 0.6 : 0.4)); s.connect(g); g.connect(this.audioCtx.destination); s.start();
-  }
-
-  playSFX(t: string) {
-    if (!this.isBrowser) return; if(!this.audioCtx) this.initAudioSystem();
-    // [UPDATE 4] Thêm 'collected' vào logic phát
-    if (t === 'bell' || t === 'santa' || t === 'collected') {
-      this.playBuffer(t as any, { gain: t==='santa'?1 : (t==='collected'?0.6:0.5) });
-      return;
-    }
-    const c = this.audioCtx; if (!c) return; const n = c.currentTime;
-    if (t === 'click') { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(800, n); o.frequency.exponentialRampToValueAtTime(100, n+0.05); g.gain.setValueAtTime(0.3, n); g.gain.exponentialRampToValueAtTime(0.001, n+0.05); o.connect(g); g.connect(c.destination); o.start(); o.stop(n+0.05); }
-    if (t==='locked') { const o = c.createOscillator(), g = c.createGain(); o.type='sawtooth'; o.frequency.value=160; g.gain.value=0.12; o.connect(g); g.connect(c.destination); o.start(); o.stop(n+0.16); }
-    if (t==='open') { const o = c.createOscillator(), g = c.createGain(); o.type='sine'; o.frequency.value=400; g.gain.value=0.12; o.connect(g); g.connect(c.destination); o.start(); o.stop(n+0.28); }
-    if (t === 'firework') { const o = c.createOscillator(), g = c.createGain(); o.type = 'square'; o.frequency.setValueAtTime(150, n); o.frequency.exponentialRampToValueAtTime(40, n+0.1); g.gain.setValueAtTime(0.1, n); g.gain.exponentialRampToValueAtTime(0.01, n+0.1); o.connect(g); g.connect(c.destination); o.start(); o.stop(n+0.15); }
-  }
-
-  playClick() { this.playSFX('click'); }
+  playClick() { this.audioService.playSFX('click'); }
   playHover() { /* opt */ }
 
   startCursorBlink() { if (this.isBrowser) this.cursorInterval = setInterval(() => { this.showCursor = !this.showCursor; this.cdr.markForCheck(); }, 500); }
 
   startTypingEffect(m: string) { this.typingText = ''; let i = 0; if (this.typingInterval) clearInterval(this.typingInterval); this.typingInterval = setInterval(() => { if (i < m.length) { this.typingText += m[i++]; this.cdr.markForCheck(); } else clearInterval(this.typingInterval); }, 40); }
 
-  revealGifts() { this.playClick(); this.showGifts = true; this.tryPlayMusic(); }
+  revealGifts() { this.playClick(); this.showGifts = true; this.audioService.tryPlayMusic(); }
 
-  openCard(i: number) { this.playClick(); this.selectedGiftIndex = i; this.isOpening = true; this.currentCard = this.cards[Math.floor(Math.random()*this.cards.length)]; setTimeout(() => { if (!this.isDestroyed) { this.isOpening = false; this.showCard = true; setTimeout(() => { if (!this.isDestroyed) { if (this.currentCard) this.startTypingEffect(this.currentCard.message); this.createConfetti(); this.createSparkles(); } }, 100); } }, 800); }
+  openCard(i: number) { this.playClick(); this.selectedGiftIndex = i; this.isOpening = true; this.currentCard = this.cards[Math.floor(Math.random()*this.cards.length)]; setTimeout(() => { if (!this.isDestroyed) { this.isOpening = false; this.showCard = true; setTimeout(() => { if (!this.isDestroyed) { if (this.currentCard) this.startTypingEffect(this.currentCard.message); this.effectService.createConfetti(); this.effectService.createSparkles(); } }, 100); } }, 800); }
 
   resetCard() { this.playClick(); this.showCard = false; this.showGifts = true; this.currentCard = null; this.typingText = ''; if (this.typingInterval) clearInterval(this.typingInterval); }
-
-  createConfetti() {
-    if (!this.isBrowser) return; const clr = ['#ff6b6b', '#ffd700', '#4ecdc4', '#ff69b4', '#00ff00', '#00bfff'];
-    for (let i = 0; i < 150; i++) setTimeout(() => { if (this.isDestroyed) return; const c = document.createElement('div'); c.className = 'confetti'; c.style.cssText = `position:fixed;width:${Math.random()*10+5}px;height:${Math.random()*10+5}px;background-color:${clr[Math.random()*clr.length|0]};left:${Math.random()*100}vw;top:-20px;transform:rotate(${Math.random()*360}deg);animation:confettiFall ${2+Math.random()*2}s ease-out forwards;pointer-events:none;z-index:99999;border-radius:${Math.random()>0.5?'50%':'0'};`; document.body.appendChild(c); setTimeout(() => c.remove(), 4000); }, i * 10);
-  }
-
-  createSparkles() { if (!this.isBrowser) return; for (let i = 0; i < 30; i++) setTimeout(() => { if (this.isDestroyed) return; const s = document.createElement('div'); s.innerHTML = '✨'; s.style.cssText = `position:fixed;left:${50+(Math.random()-0.5)*30}%;top:${50+(Math.random()-0.5)*30}%;font-size:${20+Math.random()*20}px;pointer-events:none;z-index:100000;animation:sparkleBurst 1.5s ease-out forwards;`; document.body.appendChild(s); setTimeout(() => s.remove(), 1500); }, i * 30); }
-
-  createSnow(c: number) { if (!this.isBrowser) return; const ct = document.getElementById('snow-container'); if (!ct) return; const sh = ['❄️', '❅', '❆']; for (let i = 0; i < c; i++) { const d = document.createElement('div'); d.className = 'snowflake'; d.innerHTML = sh[Math.random()*sh.length|0]; const x = Math.random()*100, y = -10-Math.random()*20; d.style.cssText = `position:absolute;left:${x}vw;top:${y}vh;font-size:${15+Math.random()*15}px;opacity:${0.6+Math.random()*0.4};color:white;pointer-events:none;z-index:9998;`; ct.appendChild(d); this.snowflakes.push({ element: d, x, y, speed: 0.3+Math.random()*0.6, rotation: Math.random()*360, rotationSpeed: (Math.random()-0.5)*2 }); } if (!this.snowInterval) this.snowInterval = setInterval(() => { if (!this.isDestroyed && this.snowflakes.length < 80) this.createSnow(3); }, 3500); }
-
-  startSnowAnimation() { if (!this.isBrowser) return; const anim = () => { if (this.isDestroyed) return; for (let i = this.snowflakes.length - 1; i >= 0; i--) { const s = this.snowflakes[i]; s.y += s.speed; s.rotation += s.rotationSpeed; s.element.style.transform = `translate(${Math.sin(s.y * 0.085) * 2}px, ${s.y}vh) rotate(${s.rotation}deg)`; if (s.y > 120) { s.element.remove(); this.snowflakes.splice(i, 1); } } this.animationId = requestAnimationFrame(anim); }; anim(); }
-
-  private setupFireworksCanvas() { if (!this.isBrowser || (this.fwCanvas && this.fwCtx)) return; this.fwCanvas = document.getElementById('fireworks-canvas') as HTMLCanvasElement; if (!this.fwCanvas) return; this.fwCtx = this.fwCanvas.getContext('2d'); this.resizeCanvas(); window.addEventListener('resize', this.resizeCanvasBound); }
-  private resizeCanvasBound = () => { this.resizeCanvas(); }
-  private resizeCanvas() { if (!this.fwCanvas) return; const r = window.devicePixelRatio || 1, w = this.fwCanvas.clientWidth, h = this.fwCanvas.clientHeight; this.fwCanvas.width = Math.floor(w*r); this.fwCanvas.height = Math.floor(h*r); if (this.fwCtx) this.fwCtx.setTransform(r,0,0,r,0,0); }
-  private startFireworks(bursts=8, strong=false) { if (!this.fwCtx || !this.fwCanvas) return; this.fwActive = true; this.fwParticles = []; const rect = this.fwCanvas.getBoundingClientRect(); for (let b = 0; b < bursts; b++) setTimeout(() => { if (!this.fwActive || this.isDestroyed) return; this.createBurst(Math.random()*rect.width, Math.random()*rect.height*0.6+rect.height*0.2, strong?120:80); this.playSFX('firework'); }, b*(strong?250:350)); const loop = () => { if (!this.fwCtx || !this.fwCanvas || !this.fwActive) return; const c = this.fwCtx; c.clearRect(0,0,this.fwCanvas.width,this.fwCanvas.height); c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(0,0,this.fwCanvas.width,this.fwCanvas.height); for (let i = this.fwParticles.length - 1; i >= 0; i--) { const p = this.fwParticles[i]; p.vy += p.gravity; p.x += p.vx; p.y += p.vy; p.life--; c.beginPath(); c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(${p.r},${p.g},${p.b},${Math.max(0, p.life/p.maxLife)})`; c.arc(p.x, p.y, p.size, 0, Math.PI*2); c.fill(); if (p.life<=0 || p.y>this.fwCanvas.height+50) this.fwParticles.splice(i,1); } this.fwAnimId = requestAnimationFrame(loop); }; this.fwAnimId = requestAnimationFrame(loop); }
-  private createBurst(cx: number, cy: number, count=80) { const pal = [[255,200,0], [255,120,120], [180,120,255], [120,220,255], [120,255,140], [255,140,220]]; for (let i = 0; i < count; i++) { const a = Math.random()*Math.PI*2, s = (Math.random()*4+2)*(Math.random()>0.85?1.6:1), rc = pal[Math.random()*pal.length|0]; this.fwParticles.push({ x:cx, y:cy, vx:Math.cos(a)*s, vy:Math.sin(a)*s*0.7-2, gravity:0.06+Math.random()*0.05, life:60+Math.random()*40, maxLife:100, size:1+Math.random()*3, r:rc[0], g:rc[1], b:rc[2] }); } }
-  private stopFireworks() { this.fwActive = false; if (this.fwAnimId) cancelAnimationFrame(this.fwAnimId); this.fwAnimId = undefined; this.fwParticles = []; if (this.fwCtx && this.fwCanvas) this.fwCtx.clearRect(0,0,this.fwCanvas.width,this.fwCanvas.height); if (this.isBrowser) window.removeEventListener('resize', this.resizeCanvasBound); }
 
   startCountdown() { if (this.countdownInterval) clearInterval(this.countdownInterval); this.countdownInterval = setInterval(() => { this.calculateCountdown(); this.cdr.markForCheck(); }, 1000); }
   calculateCountdown() { const n = new Date(), cy = n.getFullYear(); let x = new Date(cy, 11, 25); if (n > x) x = new Date(cy+1, 11, 25); const d = x.getTime() - n.getTime(); this.daysUntilChristmas = Math.max(0, Math.floor(d/(1000*60*60*24))); this.hoursUntilChristmas = Math.max(0, Math.floor((d%(1000*60*60*24))/(1000*60*60))); this.minutesUntilChristmas = Math.max(0, Math.floor((d%(1000*60*60))/(1000*60))); this.secondsUntilChristmas = Math.max(0, Math.floor((d%(1000*60))/1000)); }

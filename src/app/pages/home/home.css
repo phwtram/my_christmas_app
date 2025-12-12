@@ -255,24 +255,21 @@ button, .gift-card, .music-btn, .calendar-door { cursor: pointer; }
 /* =========================================
    10. SPECIAL EFFECTS (BANNER, REINDEER)
    ========================================= */
-/* [FIX 1] Tuần lộc bay lên trên cùng */
 .reindeer-container {
   position: fixed;
-  top: 15%; /* Bay cao hơn một chút cho thoáng */
-  left: 0;  /* Neo vào cạnh trái màn hình */
-  z-index: 200000 !important; /* Luôn nổi trên cùng (cao hơn popup) */
+  top: 15%;
+  left: 0;
+  z-index: 200000 !important;
   font-size: 80px;
   pointer-events: none;
   white-space: nowrap;
   will-change: transform;
-
-  /* Tăng thời gian bay lên 12s để tuần lộc bay thong thả, quan sát được lâu hơn */
   animation: flyAcrossFix 12s linear forwards;
 }
 
 .reindeer-sleigh {
   filter: drop-shadow(0 10px 15px rgba(0,0,0,0.3));
-  transform: scaleX(-1); /* Lật ngược để đầu hướng về bên phải */
+  transform: scaleX(-1);
   transform-origin: center;
   backface-visibility: hidden;
 }
@@ -323,15 +320,12 @@ button, .gift-card, .music-btn, .calendar-door { cursor: pointer; }
   backdrop-filter: blur(8px); animation: fadeIn 0.3s;
 }
 
-/* [FIX 2] Cấu trúc Thiệp Chuẩn: Giữ header/footer, cuộn nội dung giữa */
 .premium-popup-card {
   width: 450px; max-width: 90vw;
   background: #fffaf0; border-radius: 15px; padding: 10px;
   box-shadow: 0 0 100px rgba(0,0,0,0.9); transform: rotate(-2deg);
   animation: popupEntry 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   position: relative;
-
-  /* Giới hạn chiều cao và dùng Flexbox */
   max-height: 90vh;
   display: flex; flex-direction: column;
 }
@@ -341,8 +335,6 @@ button, .gift-card, .music-btn, .calendar-door { cursor: pointer; }
   display: flex; flex-direction: column; align-items: center;
   background: linear-gradient(90deg, transparent 50%, rgba(201,42,42,0.05) 50%), linear-gradient(0deg, transparent 50%, rgba(201,42,42,0.05) 50%);
   background-size: 20px 20px;
-
-  /* Đảm bảo nội dung con có thể co giãn */
   height: 100%; overflow: hidden;
 }
 
@@ -352,7 +344,6 @@ button, .gift-card, .music-btn, .calendar-door { cursor: pointer; }
 .premium-btn { flex-shrink: 0; background: linear-gradient(135deg, #2d8659, #236946); color: white; border: none; padding: 12px 35px; border-radius: 50px; font-size: 18px; font-family: 'Dancing Script', cursive; cursor: pointer; box-shadow: 0 5px 15px rgba(45, 134, 89, 0.4); transition: transform 0.2s; }
 .premium-btn:hover { transform: scale(1.05); }
 
-/* [FIX 3] Phần chữ tự động cuộn */
 .popup-text-content {
   text-align: center; margin-bottom: 25px;
   overflow-y: auto; flex: 1; /* Chiếm phần còn lại */
@@ -369,16 +360,15 @@ button, .gift-card, .music-btn, .calendar-door { cursor: pointer; }
 .premium-popup-card.popup-epic { border: 4px solid #9932cc; box-shadow: 0 0 80px rgba(153,50,204,0.4); }
 .premium-popup-card.popup-legendary { border: 4px solid #ffd700; box-shadow: 0 0 100px rgba(255,215,0,0.6); }
 
-/* --- [NEW STYLE] LEGENDARY CARD (Ngày 24/25) - Ấm Áp & Sang Trọng & Sọc Caro --- */
+
 .premium-popup-card.popup-legendary {
   background-color: #fffcf5;
   border: none;
-  /* [FIX 4] Pattern Sọc Caro (Plaid) Đỏ Nhạt */
+
   background-image:
     repeating-linear-gradient(0deg, transparent, transparent 29px, rgba(200, 50, 50, 0.05) 30px),
     repeating-linear-gradient(90deg, transparent, transparent 29px, rgba(200, 50, 50, 0.05) 30px);
 
-  /* Bóng đổ ấm áp */
   box-shadow: 0 15px 40px -5px rgba(184, 134, 11, 0.3), 0 0 30px rgba(255, 220, 150, 0.2) inset;
   animation: popupWarmEntry 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -485,17 +475,15 @@ button, .gift-card, .music-btn, .calendar-door { cursor: pointer; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,215,0,0.4); } 70% { box-shadow: 0 0 0 10px rgba(255,215,0,0); } }
 @keyframes pulseDay { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
 @keyframes flyAcrossFix {
-  /* Điểm bắt đầu: Nằm hoàn toàn bên ngoài mép trái (-500px) */
   0% {
     transform: translateX(-500px) translateY(0) rotate(-2deg);
   }
 
-  /* Điểm giữa: Bay lượn lên xuống nhẹ nhàng */
+
   25% { transform: translateX(25vw) translateY(-20px) rotate(2deg); }
   50% { transform: translateX(50vw) translateY(10px) rotate(-2deg); }
   75% { transform: translateX(75vw) translateY(-10px) rotate(2deg); }
 
-  /* Điểm kết thúc: Bay hẵn ra ngoài mép phải (100vw + 500px) */
   100% {
     transform: translateX(calc(100vw + 500px)) translateY(20px) rotate(-5deg);
   }
@@ -507,7 +495,6 @@ button, .gift-card, .music-btn, .calendar-door { cursor: pointer; }
 @keyframes titleGlow { 0% { text-shadow: 0 0 8px rgba(255,255,255,0.3); } 50% { text-shadow: 0 0 20px rgba(255,255,255,0.7); } 100% { text-shadow: 0 0 8px rgba(255,255,255,0.3); } }
 @keyframes shineMove { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 @keyframes iconPulse { 0% { transform: scale(1); } 100% { transform: scale(1.2); } }
-/* [FIX TUẦN LỘC] Chạy từ trái qua phải màn hình */
 @keyframes flyAcrossFix {
   0%   { transform: translateX(0) translateY(0); }
   40%  { transform: translateX(50vw) translateY(-4vh); }
@@ -672,13 +659,13 @@ button, .gift-card, .music-btn, .calendar-door { cursor: pointer; }
   100% { transform: scale(1); }
 }
 .popup-overlay {
-  position: fixed; /* Ghim chặt vào màn hình, không bị trôi theo nội dung */
+  position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(0, 0, 0, 0.85); /* Nền đen mờ */
-  z-index: 100000; /* Đảm bảo nổi cao nhất */
+  background-color: rgba(0, 0, 0, 0.85);
+  z-index: 100000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -693,10 +680,10 @@ button, .gift-card, .music-btn, .calendar-door { cursor: pointer; }
   padding: 30px;
   border-radius: 20px;
   text-align: center;
-  box-shadow: 0 0 50px rgba(255, 215, 0, 0.8); /* Viền sáng vàng */
+  box-shadow: 0 0 50px rgba(255, 215, 0, 0.8);
   border: 4px solid #ffd700;
   animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  position: relative; /* Để nút close định vị theo cái hộp này */
+  position: relative;
 }
 .reward-popup .reward-icon { font-size: 80px; margin-bottom: 10px; animation: bounce 2s infinite; }
 .reward-popup h3 { font-family: 'Dancing Script', cursive; font-size: 35px; color: #c92a2a; margin: 0; }
