@@ -17,6 +17,7 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
+            "outputPath": "dist/christmas-app",
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
             "assets": [
@@ -28,7 +29,6 @@
             "styles": [
               "src/styles.css"
             ]
-            }
           },
           "configurations": {
             "production": {
@@ -43,8 +43,7 @@
                   "maximumWarning": "50kb",
                   "maximumError": "60kb"
                 }
-              ]
-            ,
+              ],
               "outputHashing": "all"
             },
             "development": {
